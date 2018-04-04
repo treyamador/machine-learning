@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split, cross_val_predict
 from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt
 from copy import deepcopy
+from scipy import linalg
 
 
 
@@ -47,6 +48,20 @@ def println(*args):
         print(arg)
 
 
+def clone(*args):
+    return tuple(deepcopy(x) for x in args)
+
+
+
+def split_data():
+    data, target = datasets.load_boston(True)
+    train_data,test_data,train_target,test_target = train_test_split(
+        data,(target[:, np.newaxis]),test_size=0.2,random_state=42)
+    return train_data,test_data,train_target,test_target
+
+
+
+
 def load_data(data_set):
     data = data_set()
     x_axis = data.data[:,np.newaxis,2]
@@ -87,16 +102,83 @@ def lin_regr_sklearn(x_train,x_test,y_train,y_test):
 
 
 
+def lin_regr_analytical(x_train,x_test,y_train,y_test):
+    y_yt = np.matmul(y_train.T,y_train)
+    print(y_yt)
+    return
+    mtx_inv = linalg.inv(y_yt)
+    mtx_p = np.dot(mtx_inv,y_train.T)
+    weights = np.dot(mtx_p,x_train)
+    return weights
+
+
+
+def shape_data(data):
+    pass
+
+
 def driver():
     x_train,x_test,y_train,y_test = load_data(datasets.load_boston)
     y_pred,mse,r2 = lin_regr_sklearn(x_train,x_test,y_train,y_test)
-    println(y_pred,mse,r2)
-    plot(x_test,y_test,y_pred)
-
+    #println(y_pred,mse,r2)
+    print(y_pred)
     
+    weights = lin_regr_analytical(x_train,x_test,y_train,y_test)
+    println(weights)
+
+    #plot(x_test,y_test,y_pred)
+
+
+
+# testing functions
+def test_clone():
+    a = np.array([5,6,7])
+    b = np.array([1,2,3])
+    c = np.array([4,5,6])
+    d,e,f = clone(a,b,c)
+    println(a,b,c)
+    print('\n\n')
+    println(d,e,f)
+    print(type(a))
+    print(type(d))
+
+
+def test_load():
+    print(datasets.load_boston())
+
+
+def linear_regression_scikit(train_data,test_data,train_target,test_target):
+    regr = linear_model.LinearRegression()
+    regr.fit(train_data,train_target)
+    target_predict = regr.predict(test_data)
+    mse = mean_squared_error(test_target,target_predict)
+    return target_predict, mse
+
+
+
+def linear_regression_analytical(train_data,test_data,train_target,test_target):
+    inver = linalg.inv(np.matmul(train_data.T,train_data))
+    mtx_tar = np.matmul(inver,train_data.T)
+    weights = np.matmul(mtx_tar,train_target)
+    decomp = test_target - np.matmul(test_data,weights)
+    mse = (1/ (test_data.shape[0]) )*np.matmul(decomp.T,decomp)
+    #println(test_data.shape,test_target.shape)
+    return weights,mse
+
+
+
 
 if __name__ == '__main__':
-    driver()
+    #driver()
+    #test_load()
+    train_data,test_data,train_target,test_target = split_data()
+    prediction,mse = linear_regression_scikit(train_data,test_data,train_target,test_target)
+    weights,l_e = linear_regression_analytical(train_data,test_data,train_target,test_target)
+    #println(prediction.T,'\n\n',weights.T)
+    println(mse,l_e[0][0])
+
+
+
 
 
 # end of file
