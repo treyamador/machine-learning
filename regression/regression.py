@@ -112,8 +112,6 @@ def linear_regression_analytical(train_data,test_data,train_target,test_target):
     return weights,mse[0][0]
 
 
-
-
 def calculate_gradient(data,target,weights):
     decomp = calculate_decomposition(target,data,weights)
     return calculate_mean_squared_error(data.shape[0],data.T,decomp)
@@ -121,75 +119,52 @@ def calculate_gradient(data,target,weights):
 
 
 
-
 def linear_regression_numerical(train_data,test_data,train_target,test_target):
 
     train_data_w = insert_weight(train_data)
     test_data_w = insert_weight(test_data)
 
-    weights = np.full((train_data_w.shape[1],1),1)
-    epsilon = 0.01
-
-    mse_w = deepcopy(weights)
-    mse = 1000000
-
+    weights = np.full((train_data_w.shape[1],1),0)
+    weights[0] = 1
+    
+    decomp = calculate_decomposition(test_target,test_data_w,weights)
+    mse = calculate_mean_squared_error(test_data_w.shape[0],decomp.T,decomp)
+    epsilon = 0.2
+    
+    init_mse = mse
 
     for i in range(100):
-        gradient = calculate_gradient(train_data_w,train_target,weights)
-        weights = weights - epsilon*gradient
-        
-        decomp = calculate_decomposition(test_target,test_data_w,weights)
-        mse = calculate_mean_squared_error(test_data_w.shape[0],decomp.T,decomp)
+        for w in range(len(weights)):
 
-        println(mse)
+            gradient = calculate_gradient(train_data_w,train_target,weights)
 
-        #println(weights.T,gradient.T,weight_candidate.T)
+            weight_l = deepcopy(weights)
+            weight_l[w] = weights[w] - epsilon*gradient[w]
+            decomp_l = calculate_decomposition(test_target,test_data_w,weight_l)
+            mse_l = calculate_mean_squared_error(test_data_w.shape[0],decomp_l.T,decomp_l)
+            if mse_l <= mse:
+                weights = weight_l
+                mse = mse_l
 
+            weight_h = deepcopy(weights)
+            weight_h[w] = weights[w] + epsilon*gradient[w]
+            decomp_h = calculate_decomposition(test_target,test_data_w,weight_h)
+            mse_h = calculate_mean_squared_error(test_data_w.shape[0],decomp_h.T,decomp_h)
+            if mse_h <= mse:
+                weights = weight_h
+                mse = mse_h
 
-
-
-'''
-
-def linear_regression_numerical(train_data,test_data,train_target,test_target):
-
-    train_data_w = insert_weight(train_data)
-    test_data_w = insert_weight(test_data)
-
-    # todo make iterations modular?
-    weights = np.full((train_data_w.shape[1],1),1)
-    mse = 10000000
-    epsilon = 0.01
-    for i in range(1,10):
-        decomp = calculate_decomposition(train_target,train_data_w,weights)
-        gradient = calculate_mean_squared_error(train_data.shape[0],train_data_w.T,decomp)
-        candidate_w = weights - (epsilon*i)*gradient
-        pred_target = np.matmul(test_data_w,candidate_w)
-        candidate_mse = calculate_mean_squared_error(test_data.shape[0],pred_target.T,pred_target)[0][0]
-
-        #print(candidate_mse)
-        println(candidate_w.T)
-
-        if candidate_mse < mse:
-            mse = candidate_mse
-            weights = candidate_w
-            print('true!')
-
-        print(str(i)+':',candidate_mse,mse)
-
-
-        #println('\n\n\n',train_target.shape,train_data_w.shape,weights.shape,decomp.shape,gradient.shape,candidate_w.shape)
-
-
-'''
+            
+    return weights,mse
 
 
 def driver():
     train_data,test_data,train_target,test_target = split_data()
     prediction,mse = linear_regression_scikit(train_data,test_data,train_target,test_target)
     weights,l_e = linear_regression_analytical(train_data,test_data,train_target,test_target)
+    biases,n_e = linear_regression_numerical(train_data,test_data,train_target,test_target)
 
-    #println(mse,l_e)
-    linear_regression_numerical(train_data,test_data,train_target,test_target)
+    print(biases,n_e)
 
 
 if __name__ == '__main__':
