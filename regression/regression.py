@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 from scipy import linalg
 
+from time import time
+
+
 
 
 def lin_reg_ex():
@@ -42,14 +45,14 @@ def lin_reg_ex():
     plt.yticks(())
     plt.show()
 
+    
+def clone(*args):
+    return tuple(deepcopy(x) for x in args)
+
 
 def println(*args):
     for arg in args:
         print(arg)
-
-
-def clone(*args):
-    return tuple(deepcopy(x) for x in args)
 
 
 def split_data():
@@ -59,15 +62,8 @@ def split_data():
     return train_data,test_data,train_target,test_target
 
 
-def load_data(data_set):
-    data = data_set()
-    x_axis = data.data[:,np.newaxis,2]
-    x_train = x_axis[:-20]
-    x_test = x_axis[-20:]
-    y_train = data.target[:-20]
-    y_test = data.target[-20:]
-    return x_train,x_test,y_train,y_test
-
+def insert_weight(data):
+    return np.insert(data,0,[1 for x in range(data.shape[0])],axis=1)
 
 
 def plotter(x_test,y_test,y_pred):
@@ -88,25 +84,6 @@ def plot(x_test,y_test,y_pred):
     plt.show()
 
 
-def lin_regr_sklearn(x_train,x_test,y_train,y_test):
-    regr = linear_model.LinearRegression()
-    regr.fit(x_train,y_train)
-    y_pred = regr.predict(x_test)
-    mse = mean_squared_error(y_test,y_pred)
-    r2 = r2_score(y_test,y_pred)
-    return y_pred,mse,r2
-
-
-def lin_regr_analytical(x_train,x_test,y_train,y_test):
-    y_yt = np.matmul(y_train.T,y_train)
-    print(y_yt)
-    return
-    mtx_inv = linalg.inv(y_yt)
-    mtx_p = np.dot(mtx_inv,y_train.T)
-    weights = np.dot(mtx_p,x_train)
-    return weights
-
-
 def linear_regression_scikit(train_data,test_data,train_target,test_target):
     regr = linear_model.LinearRegression()
     regr.fit(train_data,train_target)
@@ -115,40 +92,95 @@ def linear_regression_scikit(train_data,test_data,train_target,test_target):
     return target_predict,mse
 
 
-'''
-
-def linear_regression_analytical(train_data,test_data,train_target,test_target):
-    inver = linalg.inv(np.matmul(train_data.T,train_data))
-    mtx_tar = np.matmul(inver,train_data.T)
-    weights = np.matmul(mtx_tar,train_target)
-    decomp = test_target - np.matmul(test_data,weights)
-    mse = (1/(test_data.shape[0]))*np.matmul(decomp.T,decomp)
-    return weights,mse
-
-'''
+def calculate_decomposition(t,X,w):
+    return t - np.matmul(X,w)
 
 
-def insert_weight(data):
-    return np.insert(data,0,[1 for x in range(data.shape[0])],axis=1)
+def calculate_mean_squared_error(n,A,B):
+    return (1/n)*np.matmul(A,B)
 
 
+# TODO break this function up into smaller, reusable chunks if possible
 def linear_regression_analytical(train_data,test_data,train_target,test_target):
     train_data_w = insert_weight(train_data)
     test_data_w = insert_weight(test_data)
     inver = linalg.inv(np.matmul(train_data_w.T,train_data_w))
     mtx_tar = np.matmul(inver,train_data_w.T)
     weights = np.matmul(mtx_tar,train_target)
-    decomp = test_target - np.matmul(test_data_w,weights)
-    mse = (1/(test_data.shape[0]))*np.matmul(decomp.T,decomp)
+    decomp = calculate_decomposition(test_target,test_data_w,weights)
+    mse = calculate_mean_squared_error(test_data.shape[0],decomp.T,decomp)
     return weights,mse[0][0]
 
 
 
+
+def calculate_gradient(data,target,weights):
+    decomp = calculate_decomposition(target,data,weights)
+    return calculate_mean_squared_error(data.shape[0],data.T,decomp)
+
+
+
+
+
 def linear_regression_numerical(train_data,test_data,train_target,test_target):
-    pass
+
+    train_data_w = insert_weight(train_data)
+    test_data_w = insert_weight(test_data)
+
+    weights = np.full((train_data_w.shape[1],1),1)
+    epsilon = 0.01
+
+    mse_w = deepcopy(weights)
+    mse = 1000000
+
+
+    for i in range(100):
+        gradient = calculate_gradient(train_data_w,train_target,weights)
+        weights = weights - epsilon*gradient
+        
+        decomp = calculate_decomposition(test_target,test_data_w,weights)
+        mse = calculate_mean_squared_error(test_data_w.shape[0],decomp.T,decomp)
+
+        println(mse)
+
+        #println(weights.T,gradient.T,weight_candidate.T)
 
 
 
+
+'''
+
+def linear_regression_numerical(train_data,test_data,train_target,test_target):
+
+    train_data_w = insert_weight(train_data)
+    test_data_w = insert_weight(test_data)
+
+    # todo make iterations modular?
+    weights = np.full((train_data_w.shape[1],1),1)
+    mse = 10000000
+    epsilon = 0.01
+    for i in range(1,10):
+        decomp = calculate_decomposition(train_target,train_data_w,weights)
+        gradient = calculate_mean_squared_error(train_data.shape[0],train_data_w.T,decomp)
+        candidate_w = weights - (epsilon*i)*gradient
+        pred_target = np.matmul(test_data_w,candidate_w)
+        candidate_mse = calculate_mean_squared_error(test_data.shape[0],pred_target.T,pred_target)[0][0]
+
+        #print(candidate_mse)
+        println(candidate_w.T)
+
+        if candidate_mse < mse:
+            mse = candidate_mse
+            weights = candidate_w
+            print('true!')
+
+        print(str(i)+':',candidate_mse,mse)
+
+
+        #println('\n\n\n',train_target.shape,train_data_w.shape,weights.shape,decomp.shape,gradient.shape,candidate_w.shape)
+
+
+'''
 
 
 def driver():
@@ -156,7 +188,8 @@ def driver():
     prediction,mse = linear_regression_scikit(train_data,test_data,train_target,test_target)
     weights,l_e = linear_regression_analytical(train_data,test_data,train_target,test_target)
 
-    println(mse,l_e)
+    #println(mse,l_e)
+    linear_regression_numerical(train_data,test_data,train_target,test_target)
 
 
 if __name__ == '__main__':
