@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 from scipy import linalg
 
+from random import randint
+from random import Random
+
 from time import time
 
 
@@ -51,8 +54,10 @@ def clone(*args):
 
 
 def println(*args):
+    print()
     for arg in args:
         print(arg)
+    print()
 
 
 def split_data():
@@ -117,54 +122,35 @@ def calculate_gradient(data,target,weights):
     return calculate_mean_squared_error(data.shape[0],data.T,decomp)
 
 
-
-
 def linear_regression_numerical(train_data,test_data,train_target,test_target):
 
     train_data_w = insert_weight(train_data)
     test_data_w = insert_weight(test_data)
 
-    weights = np.full((train_data_w.shape[1],1),0)
-    weights[0] = 1
-    
+    weights = np.full((train_data_w.shape[1],1),0.0)
     decomp = calculate_decomposition(test_target,test_data_w,weights)
     mse = calculate_mean_squared_error(test_data_w.shape[0],decomp.T,decomp)
-    epsilon = 0.2
-    
-    init_mse = mse
+    epsilon = 0.000006476
+    rounds = 1000000
 
-    for i in range(100):
-        for w in range(len(weights)):
+    for _ in range(rounds):
+        gradient = calculate_gradient(train_data_w,train_target,weights)
+        weights += gradient * epsilon
 
-            gradient = calculate_gradient(train_data_w,train_target,weights)
-
-            weight_l = deepcopy(weights)
-            weight_l[w] = weights[w] - epsilon*gradient[w]
-            decomp_l = calculate_decomposition(test_target,test_data_w,weight_l)
-            mse_l = calculate_mean_squared_error(test_data_w.shape[0],decomp_l.T,decomp_l)
-            if mse_l <= mse:
-                weights = weight_l
-                mse = mse_l
-
-            weight_h = deepcopy(weights)
-            weight_h[w] = weights[w] + epsilon*gradient[w]
-            decomp_h = calculate_decomposition(test_target,test_data_w,weight_h)
-            mse_h = calculate_mean_squared_error(test_data_w.shape[0],decomp_h.T,decomp_h)
-            if mse_h <= mse:
-                weights = weight_h
-                mse = mse_h
-
-            
-    return weights,mse
+    decomp = calculate_decomposition(test_target,test_data_w,weights)
+    mse = calculate_mean_squared_error(test_data.shape[0],decomp.T,decomp)
+    println('target data:',mse)
 
 
 def driver():
     train_data,test_data,train_target,test_target = split_data()
     prediction,mse = linear_regression_scikit(train_data,test_data,train_target,test_target)
     weights,l_e = linear_regression_analytical(train_data,test_data,train_target,test_target)
-    biases,n_e = linear_regression_numerical(train_data,test_data,train_target,test_target)
+    
+    
+    linear_regression_numerical(train_data,test_data,train_target,test_target)
 
-    print(biases,n_e)
+    
 
 
 if __name__ == '__main__':
