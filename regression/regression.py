@@ -1,4 +1,4 @@
-# a series of functions for linear regression of housing data
+# a program to analyze linear regression using sklearn, analytical, numerical methods
 
 
 # import numpy for use of matrix multiplication
@@ -108,13 +108,29 @@ def print_one(title,weight,mse_train,mse_test):
     # print type of analysis
     print(title,'\n')
     # print training mean squared error
-    print('Training Mean Squared Error:',mse_train,'\n')
+    print('Training Mean Squared Error:',mse_train)
     # print testing mean squared error
-    print('Testing Mean Squared Error:',mse_test,'\n')
+    print('Testing Mean Squared Error:',mse_test)
     # create equation with coefficients and variables
     weight_str = [str(w)+'x'+str(i) for i,w in enumerate(weight[0])]
     # print the weight equation
     print('Weights:\n',' + '.join(weight_str),'\n\n')
+
+
+def output_one(title,target,weight,prediction,mse_train,mse_test):
+    ''' output a single entry and graph '''
+    # create single subplot
+    fig1, ax1 = plt.subplots(1,sharex=True)
+    # create second subplot
+    fig2, ax2 = plt.subplots(1,sharex=True)
+    # print type of analysis, weight, mean squared errors
+    print_one(title,weight,mse_train,mse_test)
+    # plot the linear regression line
+    plot_lines(title,ax1,target,prediction)
+    # plot the offset between target and prediction
+    plot_dots(title,ax2,target,prediction)
+    # show the graphs
+    plt.show()
 
 
 def output_summary(target,*args):
@@ -253,21 +269,30 @@ def driver():
     weight_sk,predict_sk,mse_test_sk,mse_train_sk = \
         linear_regression_scikit(
             train_data,test_data,train_target,test_target)
+    # print and graph data for sklearn output
+    #output_one('sklearn Output',test_target,weight_sk,predict_sk,mse_train_sk,mse_test_sk)
+
     # get weight, prediction, and mean squared error for analytical method
     weight_a,predict_a,mse_test_a,mse_train_a = \
         linear_regression_analytical(
             train_data,test_data,train_target,test_target)
+    # print and graph data for Analytical analysis of linear regression
+    #output_one('Analytical Output',test_target,weight_a,predict_a,mse_train_a,mse_test_a)
+
     # get weight, prediction, and mean squared error for numerical method
     weight_n,predict_n,mse_test_n,mse_train_n = \
         linear_regression_numerical(
             train_data,test_data,train_target,test_target)
+    # print and graph data for Numerical analysis of linear regression
+    #output_one('Numerical Output',test_target,weight_n,predict_n,mse_train_n,mse_test_n)
+
     # output the summary information for the data and plotting
     output_summary(test_target,
         weight_sk,mse_test_sk,mse_train_sk,predict_sk,
         weight_a,mse_test_a,mse_train_a,predict_a,
         weight_n,mse_test_n,mse_train_n,predict_n)
 
-
+    
 if __name__ == '__main__':
     ''' entry point of program '''
     driver()
