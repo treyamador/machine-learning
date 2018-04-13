@@ -27,6 +27,10 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 
 
+def types_analysis():
+    return ['sklearn','Analytical','Numerical']
+
+
 def clone(*args):
     ''' function to deepcopy and return a series of arguments '''
     return tuple(deepcopy(x) for x in args)
@@ -56,36 +60,10 @@ def split_boston_data():
     return train_data,test_data,train_target,test_target
 
 
-def plot(plot_type,target,*predictions):
-    ''' plot a number of predictions  '''
-    # create number of subplots based on number of predictions
-    fig, ax = plt.subplots(len(predictions), sharex=True)
-    # iterate through each prediction
-    for index,predict in enumerate(predictions):
-        # plot single subplots
-        #plot_dots(ax[index],target,predict)
-        plot_type(ax[index],target,predict)
-    # show the multiple subplots
-    fig.show()
-    
-
-
 def plot_lines(ax,target,predict):
-    # plot a single subplot based on targets and predictions
-    
+    ''' plot a single subplot based on targets and predictions '''    
     # create single scatterplot
     ax.scatter(target,predict,edgecolors=(0,0,0))
-    #ax.plot(target,predict,'r.',markersize=12)
-
-    #points = [[[i, target[i]], [i, predict[i]]] for i in range(min(len(target),len(predict)))]
-    
-    #lines = LineCollection(lines, array=z, cmap=plt.cm.rainbow, linewidths=5)
-    #ax.add_collection(lines)
-    
-    #ax.plot(points,edgecolors=(0,0,0))
-    #lines = LineCollection(points,linewidths=1,colors='green')
-    #ax.add_collection(lines)
-
     data_min,data_max = np.amin(target),np.amax(target)
     ax.plot([data_min,data_max],[data_min,data_max],'k.--',lw=4)
     ax.set_xlabel('Measured')
@@ -94,7 +72,6 @@ def plot_lines(ax,target,predict):
 
 def plot_dots(ax,target,predict):
     ''' plot a single subplot based on targets and predictions '''
-
     N = len(predict)
     x = np.arange(N)
     inds = np.argsort(target.T[0])
@@ -105,8 +82,8 @@ def plot_dots(ax,target,predict):
     lines = LineCollection(points,linewidths=1,colors='black',zorder=0)
     lines.set_linewidths(0.5*np.ones(N))
 
-    ax.plot(x,targ_s,'r-',linewidth=2)
-    ax.plot(x,pred_s,'g.',markersize=2)
+    ax.scatter(x,targ_s,s=9,edgecolors=(0,0,0))
+    ax.scatter(x,pred_s,s=9,edgecolors=(0,0,0))
     ax.add_collection(lines)
     ax.set_xlabel('Measured')
     ax.set_ylabel('Predicted')
@@ -120,10 +97,18 @@ def print_one(title,weight,mse_train,mse_test):
     print('Weights:\n',' + '.join(weight_str),'\n\n')
 
 
-def print_summary(*args):
-    for i,c in enumerate(['sklearn','Analytical','Numerical']):
-        off = i*3
-        print_one(c,args[off],args[off+1],args[off+2])
+def output_summary(target,*args):
+    analyses = types_analysis()
+    N = len(analyses)
+    A = int(len(args)/N)
+    fig1, ax1 = plt.subplots(N,sharex=True)
+    fig2, ax2 = plt.subplots(N,sharex=True)
+    for i in range(N):
+        off = i*A
+        print_one(analyses[i],args[off],args[off+1],args[off+2])
+        plot_dots(ax1[i],target,args[off+3])
+        plot_lines(ax2[i],target,args[off+3])
+    plt.show()
 
 
 def insert_weight(data):
@@ -198,13 +183,11 @@ def driver():
     weight_n,predict_n,mse_test_n,mse_train_n = \
         linear_regression_numerical(
             train_data,test_data,train_target,test_target)
-    print_summary(
-        weight_sk,mse_test_sk,mse_train_sk,
-        weight_a,mse_test_a,mse_train_a,
-        weight_n,mse_test_n,mse_train_n)
-    plot(plot_dots,test_target,predict_sk,predict_a,predict_n)
-    plot(plot_lines,test_target,predict_sk,predict_a,predict_n)
-    plt.show()
+
+    output_summary(test_target,
+        weight_sk,mse_test_sk,mse_train_sk,predict_sk,
+        weight_a,mse_test_a,mse_train_a,predict_a,
+        weight_n,mse_test_n,mse_train_n,predict_n)
 
 
 if __name__ == '__main__':
