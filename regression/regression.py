@@ -293,9 +293,9 @@ def driver():
         weight_n,mse_test_n,mse_train_n,predict_n)
 
     
-if __name__ == '__main__':
-    ''' entry point of program '''
-    driver()
+#if __name__ == '__main__':
+#    ''' entry point of program '''
+#    driver()
 
 
 # end of file
