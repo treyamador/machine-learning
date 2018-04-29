@@ -57,52 +57,34 @@ def generate_data(x_paths, y_target, batch):
         idx = (idx+batch) % mod
 
 
-def plot_history(history, path, file_time):
+def plot_one(history, path, file_time, fig_num, metric):
 
-    loss_list = [s for s in history.history.keys() if 'loss' in s and 'val' not in s]
-    val_loss_list = [s for s in history.history.keys() if 'loss' in s and 'val' in s]
-    mae_list = [s for s in history.history.keys() if 'mean' in s and 'val' not in s]
-    val_mae_list = [s for s in history.history.keys() if 'mean' in s and 'val' in s]
+    metric_list = [s for s in history.history.keys() if metric in s and 'val' not in s]
+    val_list = [s for s in history.history.keys() if metric in s and 'val' in s]
 
-    if len(loss_list) == 0:
-        print('Loss is missing in history')
-        return
+    if len(metric_list) > 0:
+        epochs = range(1, len(history.history[metric_list[0]]) + 1)
+        plt.figure(fig_num)
 
-    # As loss always exists
-    epochs = range(1, len(history.history[loss_list[0]]) + 1)
-
-    # Loss
-    plt.figure(1)
-    for l in loss_list:
-        plt.plot(epochs, history.history[l], 'b',
-                 label='Training loss (' + str(str(format(history.history[l][-1], '.5f')) + ')'))
-    for l in val_loss_list:
-        plt.plot(epochs, history.history[l], 'g',
-                 label='Validation loss (' + str(str(format(history.history[l][-1], '.5f')) + ')'))
-
-    plt.title('Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-
-    plt.savefig(path + '_loss_' + file_time + '.png')
-
-    if len(mae_list) > 0:
-        # Accuracy
-        plt.figure(2)
-        for l in mae_list:
+        for l in metric_list:
             plt.plot(epochs, history.history[l], 'b',
-                     label='Mean Absolute Error (' + str(format(history.history[l][-1], '.5f')) + ')')
-        for l in val_mae_list:
+                     label='training '+metric+' (' + str(str(format(history.history[l][-1], '.5f')) + ')'))
+        for l in val_list:
             plt.plot(epochs, history.history[l], 'g',
-                     label='Validation MAE (' + str(format(history.history[l][-1], '.5f')) + ')')
+                     label='validation '+metric+' (' + str(str(format(history.history[l][-1], '.5f')) + ')'))
 
-        plt.title('Accuracy')
-        plt.xlabel('Epochs')
-        plt.ylabel('Mean Absolute Error')
+        plt.title(metric)
+        plt.xlabel('epochs')
+        plt.ylabel(metric)
         plt.legend()
 
-        plt.savefig(path+'_mae_'+file_time+'.png')
+        plt.savefig(path+'_'+metric+'_'+file_time+'.png')
+
+
+def plot_history(history, path, file_time):
+    plot_one(history, path, file_time, 1, 'loss')
+    plot_one(history, path, file_time, 2, 'mean_squared_error')
+    plot_one(history, path, file_time, 3, 'mean_absolute_error')
 
 
 def save_model(path, model, history):
@@ -137,7 +119,7 @@ def create_model():
 
     model.compile(loss='mse',
                   optimizer='rmsprop',
-                  metrics=['mae'])
+                  metrics=['mae', 'mse', 'acc'])
 
     return model
 
@@ -148,7 +130,7 @@ def run_linear():
 
     steps_per_epoch = (len(train_paths)+len(val_paths)) // BATCH_SIZE
     validation_steps = len(val_paths) // BATCH_SIZE
-    epochs = 2
+    epochs = 23
 
     model = create_model()
     history = model.fit_generator(generate_data(train_paths, train_ages, BATCH_SIZE),
