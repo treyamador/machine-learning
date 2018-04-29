@@ -8,16 +8,21 @@ from keras.models import Sequential
 from keras.utils import plot_model
 import matplotlib.pyplot as plt
 from keras import backend as K
-from skimage import transform
 from datetime import datetime
 from skimage import io
 import numpy as np
 
 
-BASE_IMG_PATH = 'data/modtrain-dSTD-crop-b4'
-IMG_WIDTH = 150
-IMG_HEIGHT = 150
+BASE_IMG_PATH = 'data/modtrain-d148-crop-b4'
 BATCH_SIZE = 128
+
+# IMG_WIDTH = 150
+# IMG_HEIGHT = 150
+# IMG_WIDTH = 192
+# IMG_HEIGHT = 192
+
+IMG_HEIGHT = 148
+IMG_WIDTH = 148
 
 
 if K.image_data_format() == 'channels_first':
@@ -37,46 +42,22 @@ def sep_paths():
     paths = [BASE_IMG_PATH+'/'+x for x in paths]
     i = (4*len(paths))//5
     train_path, val_path = paths[:i], paths[i:]
-    train_age, val_age = ages[:i], ages[:i]
+    train_age, val_age = ages[:i], ages[i:]
     return train_path, train_age, val_path, val_age
 
 
-'''
-
-def generate_data(x_paths, y_target, batch_size):
+def generate_data(x_paths, y_target, batch):
+    mod, idx = len(x_paths), 0
     while True:
-        for path, trgt in zip(x_paths, y_target):
-            img = io.imread(path)
-            # can reshape data here, ie, change height and width
-            img = transform.resize(img, (IMG_HEIGHT, IMG_WIDTH))
-            img = np.array(img, dtype=np.float32)/255
-            yield (img, trgt)
-
-'''
-
-
-def generate_data(x_paths, y_target, batch_size):
-    index, mod = 0, len(x_paths)
-    while True:
-        x, y = [], []
-        for b in range(batch_size):
-            img = io.imread(x_paths[index])
-            img = transform.resize(img, (IMG_HEIGHT, IMG_WIDTH))
-            x.append(img)
-            y.append(y_target[index])
-            index = (index+1) % mod
-        x = np.array(x, dtype=np.float32)/255
-        y = np.array(y, dtype=np.float32)
+        imgs = [io.imread(x_paths[i % mod]) for i in range(idx, batch+idx)]
+        trgs = [y_target[i % mod] for i in range(idx, batch+idx)]
+        x = np.array(imgs, dtype=np.float32)/255
+        y = np.array(trgs, dtype=np.float32)
         yield (x, y)
+        idx = (idx+batch) % mod
 
 
-# class GeneratorCallback(Callback):
-
-#     def on_batch_end(self, epoch, logs={}):
-#         print(logs)
-
-
-def plot_history(history):
+def plot_history(history, path, file_time):
 
     loss_list = [s for s in history.history.keys() if 'loss' in s and 'val' not in s]
     val_loss_list = [s for s in history.history.keys() if 'loss' in s and 'val' in s]
@@ -104,6 +85,8 @@ def plot_history(history):
     plt.ylabel('Loss')
     plt.legend()
 
+    plt.savefig(path + '_loss_' + file_time + '.png')
+
     if len(mae_list) > 0:
         # Accuracy
         plt.figure(2)
@@ -119,14 +102,15 @@ def plot_history(history):
         plt.ylabel('Mean Absolute Error')
         plt.legend()
 
-    plt.show()
+        plt.savefig(path+'_mae_'+file_time+'.png')
 
 
-def save_model(path, model):
+def save_model(path, model, history):
     file_time = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     model.save_weights(path+'_weights_'+file_time+'.h5')
     model.save(path+'_model_'+file_time+'.h5')
     plot_model(model, to_file=path+'_summary'+file_time+'.png', show_shapes=True)
+    plot_history(history, path, file_time)
 
 
 def create_model():
@@ -162,7 +146,6 @@ def run_linear():
 
     train_paths, train_ages, val_paths, val_ages = sep_paths()
 
-    # batch_size = 128
     steps_per_epoch = (len(train_paths)+len(val_paths)) // BATCH_SIZE
     validation_steps = len(val_paths) // BATCH_SIZE
     epochs = 2
@@ -175,8 +158,7 @@ def run_linear():
                                   validation_data=generate_data(val_paths, val_ages, BATCH_SIZE),
                                   validation_steps=validation_steps)
 
-    save_model('data/ages', model)
-    plot_history(history)
+    save_model('data/ages', model, history)
 
 
 if __name__ == '__main__':
