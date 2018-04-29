@@ -4,6 +4,8 @@ from keras.layers import Dense, Dropout, Flatten, Activation
 from keras.layers import Conv2D, MaxPooling2D
 # from keras.callbacks import EarlyStopping
 # from keras.callbacks import Callback
+from keras.callbacks import ModelCheckpoint
+from keras.optimizers import Adam
 from keras.models import Sequential
 from keras.utils import plot_model
 import matplotlib.pyplot as plt
@@ -11,6 +13,7 @@ from keras import backend as K
 from datetime import datetime
 from skimage import io
 import numpy as np
+import os
 
 
 BASE_IMG_PATH = 'data/modtrain-d148-crop-b4'
@@ -57,7 +60,7 @@ def generate_data(x_paths, y_target, batch):
         idx = (idx+batch) % mod
 
 
-def plot_one(history, path, file_time, fig_num, metric):
+def plot_one(history, path, fig_num, metric):
 
     metric_list = [s for s in history.history.keys() if metric in s and 'val' not in s]
     val_list = [s for s in history.history.keys() if metric in s and 'val' in s]
@@ -78,21 +81,25 @@ def plot_one(history, path, file_time, fig_num, metric):
         plt.ylabel(metric)
         plt.legend()
 
-        plt.savefig(path+'_'+metric+'_'+file_time+'.png')
+        plt.savefig(path+''+metric+'.png')
 
 
-def plot_history(history, path, file_time):
-    plot_one(history, path, file_time, 1, 'loss')
-    plot_one(history, path, file_time, 2, 'mean_squared_error')
-    plot_one(history, path, file_time, 3, 'mean_absolute_error')
+def plot_history(history, path):
+    plot_one(history, path, 1, 'loss')
+    plot_one(history, path, 2, 'mean_squared_error')
+    plot_one(history, path, 3, 'mean_absolute_error')
+    plot_one(history, path, 4, 'acc')
+
+
+def current_time():
+    return datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 
 
 def save_model(path, model, history):
-    file_time = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    model.save_weights(path+'_weights_'+file_time+'.h5')
-    model.save(path+'_model_'+file_time+'.h5')
-    plot_model(model, to_file=path+'_summary'+file_time+'.png', show_shapes=True)
-    plot_history(history, path, file_time)
+    model.save_weights(path+'weights_final.h5')
+    model.save(path+'model_final.h5')
+    plot_model(model, to_file=path+'model_summary.png', show_shapes=True)
+    plot_history(history, path)
 
 
 def create_model():
@@ -118,7 +125,7 @@ def create_model():
     model.add(Dense(1))
 
     model.compile(loss='mse',
-                  optimizer='rmsprop',
+                  optimizer=Adam(),
                   metrics=['mae', 'mse', 'acc'])
 
     return model
@@ -128,19 +135,37 @@ def run_linear():
 
     train_paths, train_ages, val_paths, val_ages = sep_paths()
 
+    # TODO remove this
+    train_paths = train_paths[:432]
+    train_ages = train_ages[:432]
+    val_paths = val_paths[:223]
+    val_ages = val_ages[:223]
+    # TODO remove this
+
     steps_per_epoch = (len(train_paths)+len(val_paths)) // BATCH_SIZE
     validation_steps = len(val_paths) // BATCH_SIZE
-    epochs = 23
+    epochs = 50
+
+    epochs = 3
+
+    file_time = current_time()
+    os.mkdir('models/'+file_time)
+
+    callback_checkpoint = ModelCheckpoint('models/' + file_time +
+                                          '/model.epoch: {epoch: 02d} - mse: {mean_squared_error: .2f}.hdf5')
 
     model = create_model()
     history = model.fit_generator(generate_data(train_paths, train_ages, BATCH_SIZE),
                                   steps_per_epoch=steps_per_epoch,
                                   epochs=epochs,
                                   verbose=1,
+                                  callbacks=[callback_checkpoint],
                                   validation_data=generate_data(val_paths, val_ages, BATCH_SIZE),
                                   validation_steps=validation_steps)
 
-    save_model('data/ages', model, history)
+    # print('Keys to history', history.history.keys())
+
+    save_model('models/'+file_time+'/', model, history)
 
 
 if __name__ == '__main__':
