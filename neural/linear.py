@@ -2,12 +2,12 @@ from __future__ import print_function
 
 from keras.layers import Dense, Dropout, Flatten, Activation
 from keras.layers import Conv2D, MaxPooling2D
-# from keras.callbacks import EarlyStopping
-# from keras.callbacks import Callback
+from keras.callbacks import EarlyStopping
 from keras.callbacks import ModelCheckpoint
 from keras.optimizers import Adam
 from keras.models import Sequential
 from keras.utils import plot_model
+from keras.applications.resnet50 import ResNet50
 import matplotlib.pyplot as plt
 from keras import backend as K
 from datetime import datetime
@@ -16,7 +16,7 @@ import numpy as np
 import os
 
 
-BASE_IMG_PATH = 'data/modtrain-d148-crop-b4'
+BASE_IMG_PATH = 'data/modtrain-d224-crop-b4'
 BATCH_SIZE = 128
 
 # IMG_WIDTH = 150
@@ -131,39 +131,37 @@ def create_model():
     return model
 
 
+def create_resnet_50():
+    model = ResNet50(weights=None)
+    model.compile(loss='mse',
+                  optimizer=Adam(),
+                  metrics=['mae', 'mse', 'acc'])
+    return model
+
+
 def run_linear():
 
     train_paths, train_ages, val_paths, val_ages = sep_paths()
-
-    # TODO remove this
-    train_paths = train_paths[:432]
-    train_ages = train_ages[:432]
-    val_paths = val_paths[:223]
-    val_ages = val_ages[:223]
-    # TODO remove this
 
     steps_per_epoch = (len(train_paths)+len(val_paths)) // BATCH_SIZE
     validation_steps = len(val_paths) // BATCH_SIZE
     epochs = 50
 
-    epochs = 3
-
     file_time = current_time()
     os.mkdir('models/'+file_time)
 
+    callback_stopping = EarlyStopping()
     callback_checkpoint = ModelCheckpoint('models/' + file_time +
                                           '/model.epoch: {epoch: 02d} - mse: {mean_squared_error: .2f}.hdf5')
 
-    model = create_model()
+    model = create_resnet_50()
     history = model.fit_generator(generate_data(train_paths, train_ages, BATCH_SIZE),
                                   steps_per_epoch=steps_per_epoch,
                                   epochs=epochs,
                                   verbose=1,
-                                  callbacks=[callback_checkpoint],
+                                  callbacks=[callback_checkpoint, callback_stopping],
                                   validation_data=generate_data(val_paths, val_ages, BATCH_SIZE),
                                   validation_steps=validation_steps)
-
-    # print('Keys to history', history.history.keys())
 
     save_model('models/'+file_time+'/', model, history)
 
