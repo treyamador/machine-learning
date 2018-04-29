@@ -1,12 +1,15 @@
 from __future__ import print_function
 
-# from keras import utils
-from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten, Activation
 from keras.layers import Conv2D, MaxPooling2D
 # from keras.callbacks import EarlyStopping
+# from keras.callbacks import Callback
+from keras.models import Sequential
+from keras.utils import plot_model
+import matplotlib.pyplot as plt
 from keras import backend as K
-
+from skimage import transform
+from datetime import datetime
 from skimage import io
 import numpy as np
 
@@ -14,6 +17,8 @@ import numpy as np
 BASE_IMG_PATH = 'data/modtrain-dSTD-crop-b4'
 IMG_WIDTH = 150
 IMG_HEIGHT = 150
+BATCH_SIZE = 128
+
 
 if K.image_data_format() == 'channels_first':
     input_shape = (3, IMG_WIDTH, IMG_HEIGHT)
@@ -36,12 +41,92 @@ def sep_paths():
     return train_path, train_age, val_path, val_age
 
 
-def generate_file_imgs(x_paths, y_target):
+'''
+
+def generate_data(x_paths, y_target, batch_size):
     while True:
         for path, trgt in zip(x_paths, y_target):
             img = io.imread(path)
+            # can reshape data here, ie, change height and width
+            img = transform.resize(img, (IMG_HEIGHT, IMG_WIDTH))
             img = np.array(img, dtype=np.float32)/255
             yield (img, trgt)
+
+'''
+
+
+def generate_data(x_paths, y_target, batch_size):
+    index, mod = 0, len(x_paths)
+    while True:
+        x, y = [], []
+        for b in range(batch_size):
+            img = io.imread(x_paths[index])
+            img = transform.resize(img, (IMG_HEIGHT, IMG_WIDTH))
+            x.append(img)
+            y.append(y_target[index])
+            index = (index+1) % mod
+        x = np.array(x, dtype=np.float32)/255
+        y = np.array(y, dtype=np.float32)
+        yield (x, y)
+
+
+# class GeneratorCallback(Callback):
+
+#     def on_batch_end(self, epoch, logs={}):
+#         print(logs)
+
+
+def plot_history(history):
+
+    loss_list = [s for s in history.history.keys() if 'loss' in s and 'val' not in s]
+    val_loss_list = [s for s in history.history.keys() if 'loss' in s and 'val' in s]
+    mae_list = [s for s in history.history.keys() if 'mean' in s and 'val' not in s]
+    val_mae_list = [s for s in history.history.keys() if 'mean' in s and 'val' in s]
+
+    if len(loss_list) == 0:
+        print('Loss is missing in history')
+        return
+
+    # As loss always exists
+    epochs = range(1, len(history.history[loss_list[0]]) + 1)
+
+    # Loss
+    plt.figure(1)
+    for l in loss_list:
+        plt.plot(epochs, history.history[l], 'b',
+                 label='Training loss (' + str(str(format(history.history[l][-1], '.5f')) + ')'))
+    for l in val_loss_list:
+        plt.plot(epochs, history.history[l], 'g',
+                 label='Validation loss (' + str(str(format(history.history[l][-1], '.5f')) + ')'))
+
+    plt.title('Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+
+    if len(mae_list) > 0:
+        # Accuracy
+        plt.figure(2)
+        for l in mae_list:
+            plt.plot(epochs, history.history[l], 'b',
+                     label='Mean Absolute Error (' + str(format(history.history[l][-1], '.5f')) + ')')
+        for l in val_mae_list:
+            plt.plot(epochs, history.history[l], 'g',
+                     label='Validation MAE (' + str(format(history.history[l][-1], '.5f')) + ')')
+
+        plt.title('Accuracy')
+        plt.xlabel('Epochs')
+        plt.ylabel('Mean Absolute Error')
+        plt.legend()
+
+    plt.show()
+
+
+def save_model(path, model):
+    file_time = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    model.save_weights(path+'_weights_'+file_time+'.h5')
+    model.save(path+'_model_'+file_time+'.h5')
+    plot_model(model, to_file=path+'_summary'+file_time+'.png', show_shapes=True)
 
 
 def create_model():
@@ -75,19 +160,26 @@ def create_model():
 
 def run_linear():
 
-    batch_size = 128
+    train_paths, train_ages, val_paths, val_ages = sep_paths()
+
+    # batch_size = 128
+    steps_per_epoch = (len(train_paths)+len(val_paths)) // BATCH_SIZE
+    validation_steps = len(val_paths) // BATCH_SIZE
     epochs = 2
 
-    img_cols, img_rows = 384, 384
-    channels = 3
-
-    train_paths, train_ages, val_paths, val_ages = sep_paths()
-    # generate_file_imgs(train_paths, train_ages)
-
     model = create_model()
-    model.summary()
+    history = model.fit_generator(generate_data(train_paths, train_ages, BATCH_SIZE),
+                                  steps_per_epoch=steps_per_epoch,
+                                  epochs=epochs,
+                                  verbose=1,
+                                  validation_data=generate_data(val_paths, val_ages, BATCH_SIZE),
+                                  validation_steps=validation_steps)
+
+    save_model('data/ages', model)
+    plot_history(history)
 
 
 if __name__ == '__main__':
     run_linear()
 
+# end of file

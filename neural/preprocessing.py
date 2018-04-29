@@ -15,6 +15,8 @@ import os
 # DEFAULT_DIMENSION = 384
 BORDER_NORM = 4
 
+DEFAULT_DIMENSION = 192
+
 
 # WIDTH_BORDER = 5
 # HEIGHT_BORDER = 3
@@ -60,7 +62,7 @@ def process_img(img):
     top_off, btm_off, lft_off, rgt_off = top-hgt, btm+hgt, lft-wth, rgt+wth
 
     # shifting offset up
-    top_off -= hgt
+    # top_off -= hgt
     # btm_off -= hgt
 
     top_off = top_off if top_off > 0 else 0
@@ -71,7 +73,7 @@ def process_img(img):
     img = img[top_off:btm_off, lft_off:rgt_off, ]
 
     # TODO remove this, or write it programmatically
-    # img = transform.resize(img, (DEFAULT_DIMENSION, DEFAULT_DIMENSION,))
+    img = transform.resize(img, (DEFAULT_DIMENSION, DEFAULT_DIMENSION,))
 
     if len(img.shape) == 2:
         img = color.gray2rgb(img)
@@ -80,7 +82,7 @@ def process_img(img):
 
 def run():
     bp = 'data/train'
-    mp = 'data/modtrain'+'-d'+str('STD')+'-crop-b'+str(BORDER_NORM)
+    mp = 'data/modtrain'+'-d'+str(DEFAULT_DIMENSION)+'-crop-b'+str(BORDER_NORM)
     os.mkdir(mp)
     exts = [x for x in os.listdir(bp)]
     paths = [bp+'/'+x for x in exts]
@@ -96,9 +98,6 @@ def run():
                 io.imsave(mp+'/'+ext, img)
             print(itr, 'of', ttl)
             itr += 1
-
-            if itr > 100:
-                break
 
 
 if __name__ == '__main__':
