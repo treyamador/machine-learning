@@ -19,20 +19,15 @@ from keras.applications.inception_v3 import InceptionV3
 from keras.applications.vgg19 import VGG19
 
 
-BASE_IMG_PATH = 'data/modtrain-d224-crop-b4'
+BASE_IMG_PATH = 'data/modtrain-d148-crop-b4'
 BATCH_SIZE = 128
-VALID_BATCH = (4*BATCH_SIZE)//5
+VALID_BATCH = BATCH_SIZE
 
 PIXEL_NORMAL = 255.0
-AGE_NORMAL = 128.0
+# AGE_NORMAL = 128.0
 
-IMG_WIDTH = 224
-IMG_HEIGHT = 224
-# IMG_WIDTH = 192
-# IMG_HEIGHT = 192
-
-# IMG_HEIGHT = 299
-# IMG_WIDTH = 299
+IMG_WIDTH = 148
+IMG_HEIGHT = 148
 
 
 if K.image_data_format() == 'channels_first':
@@ -62,7 +57,7 @@ def generate_data(x_paths, y_target, batch):
         imgs = [io.imread(x_paths[i % mod]) for i in range(idx, batch+idx)]
         trgs = [y_target[i % mod] for i in range(idx, batch+idx)]
         x = np.array(imgs, dtype=np.float32) / PIXEL_NORMAL
-        y = np.array(trgs, dtype=np.float32) / AGE_NORMAL
+        y = np.array(trgs, dtype=np.float32)
         yield (x, y)
         idx = (idx+batch) % mod
 
@@ -94,7 +89,6 @@ def plot_one(history, path, fig_num, metric):
 def plot_history(history, path):
     plot_one(history, path, 1, 'loss')
     plot_one(history, path, 2, 'mean_squared_error')
-    # plot_one(history, path, 3, 'mean_absolute_error')
     plot_one(history, path, 4, 'acc')
 
 
@@ -107,6 +101,18 @@ def save_model(path, model, history):
     model.save(path+'model_final.h5')
     plot_model(model, to_file=path+'model_summary.png', show_shapes=True)
     plot_history(history, path)
+
+
+def create_trivial():
+    model = Sequential()
+    model.add(Conv2D(32, (3, 3), input_shape=input_shape))
+    model.add(Activation('relu'))
+    model.add(Flatten())
+    model.add(Dense(1))
+    model.compile(loss='mse',
+                  optimizer='sgd',
+                  metrics=['mae', 'mse', 'acc'])
+    return model
 
 
 def create_model():
@@ -171,7 +177,7 @@ def create_convolutional():
 
     model.compile(loss='mse',
                   optimizer=Adam(),
-                  metrics=['mae', 'mse', 'acc'])
+                  metrics=['mse', 'acc'])
 
     return model
 
@@ -244,8 +250,8 @@ def run_linear():
 
     train_paths, train_ages, val_paths, val_ages = sep_paths()
 
-    steps_per_epoch = (len(train_paths)+len(val_paths)) // BATCH_SIZE
-    validation_steps = len(val_paths) // VALID_BATCH
+    steps_per_epoch = len(train_paths) / BATCH_SIZE
+    validation_steps = len(val_paths) / VALID_BATCH
     epochs = 50
 
     file_time = current_time()
@@ -255,7 +261,7 @@ def run_linear():
     callback_checkpoint = ModelCheckpoint('models/' + file_time +
                                           '/model.epoch: {epoch: 02d} - mse: {mean_squared_error: .2f}.hdf5')
 
-    model = create_vgg16_custom()
+    model = create_convolutional()
     history = model.fit_generator(generate_data(train_paths, train_ages, BATCH_SIZE),
                                   steps_per_epoch=steps_per_epoch,
                                   epochs=epochs,
