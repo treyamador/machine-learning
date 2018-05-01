@@ -6,6 +6,7 @@ from skimage import io
 import dlib
 import cv2
 import os
+import numpy as np
 
 
 # DEFAULT_DIMENSION = 500
@@ -13,7 +14,7 @@ import os
 
 
 # DEFAULT_DIMENSION = 384
-BORDER_NORM = 4
+BORDER_NORM = 3
 
 # DEFAULT_DIMENSION = 192
 
@@ -84,26 +85,48 @@ def process_img(img):
     return img
 
 
+def get_mp():
+    return 'data/modtrain'+'-d'+str(DEFAULT_DIMENSION)+'-crop-b'+str(BORDER_NORM)
+
+
 def run():
     bp = 'data/train'
-    mp = 'data/modtrain'+'-d'+str(DEFAULT_DIMENSION)+'-crop-b'+str(BORDER_NORM)
-    os.mkdir(mp)
+    mp = get_mp()
+    # os.mkdir(mp)
     exts = [x for x in os.listdir(bp)]
     paths = [bp+'/'+x for x in exts]
     directory = read_training()
     imgs = io.imread_collection(paths)
+    out_ages = []
+    out_imgs = []
+    out_dirs = []
     ttl = len(exts)
-    with open(mp+'_target.csv', 'wt') as f_obj:
-        itr = 1
-        for ext, img in zip(exts, imgs):
-            img = process_img(img)
-            if img is not None:
-                f_obj.write(ext+','+str(directory[ext])+'\n')
-                io.imsave(mp+'/'+ext, img)
-            print(itr, 'of', ttl)
-            itr += 1
+    itr = 1
+    for ext, img in zip(exts, imgs):
+        img = process_img(img)
+        if img is not None:
+            out_ages.append(directory[ext])
+            out_imgs.append(img)
+            print(itr, 'of', ttl, 'at', ext)
+            out_dirs.append(ext)
+        itr += 1
+    np.save(mp+'.npy', out_imgs)
+    np.save(mp+'_target.npy', out_ages)
+    return out_dirs
+
+
+def validate_files(exts):
+    imgs = np.load(get_mp()+'.npy')
+    ages = np.load(get_mp()+'_target.npy')
+    # for i, ext in enumerate(exts):
+    #     print(i, 'at', ext, '...', ages[i])
+    #     show_cv(imgs[i])
+    print('\n\nof the shape:')
+    print(imgs.shape)
+    print(ages.shape)
 
 
 if __name__ == '__main__':
-    run()
+    exts = run()
+    validate_files(exts)
 
