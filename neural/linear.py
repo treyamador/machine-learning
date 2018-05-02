@@ -4,7 +4,7 @@ from keras.layers import Dense, Dropout, Flatten, Activation, BatchNormalization
 from keras.layers import Conv2D, MaxPooling2D
 from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
 from keras.optimizers import Adam, SGD
-from keras.models import Sequential, Model
+from keras.models import Sequential, Model, load_model
 from keras.utils import plot_model
 import matplotlib.pyplot as plt
 from keras import backend as K
@@ -95,8 +95,8 @@ def current_time():
 def save_model(path, model, history):
     model.save_weights(path+'weights_final.h5')
     model.save(path+'model_final.h5')
-    plot_history(history, path)
-    plot_model(model, to_file=path+'model_summary.png', show_shapes=True)
+    # plot_history(history, path)
+    # plot_model(model, to_file=path+'model_summary.png', show_shapes=True)
 
 
 def create_trivial():
@@ -187,6 +187,8 @@ def create_VGG16():
     x = GlobalAveragePooling2D()(x)
     x = Dense(1024, activation='relu')(x)
     x = Dropout(0.3)(x)
+    x = Dense(1024, activation='relu')(x)
+    x = Dropout(0.3)(x)
     predictions = Dense(1)(x)
 
     model = Model(inputs=base_model.input, outputs=predictions)
@@ -211,8 +213,8 @@ def train_VGG16(model, epochs):
     os.mkdir('models/'+file_time)
 
     callback_stopping = EarlyStopping(patience=3, monitor='val_loss')
-    callback_checkpoint = ModelCheckpoint('models/model.vgg16.epoch.best.hdf5',
-                                          save_best_only=True, monitor='val_loss')
+    callback_checkpoint = ModelCheckpoint('models/'+file_time+'/model.vgg16.{epoch:02d}-{val_loss:.2f}.hdf5',
+                                          monitor='val_loss')
     callback_csv = CSVLogger('models/'+file_time+'/run_log.csv', append=True)
 
     history = model.fit_generator(generate_data(train_paths, train_ages, BATCH_SIZE),
@@ -243,7 +245,7 @@ def run_linear():
                                 momentum=0.9),
                   metrics=['acc', 'mse'])
 
-    train_VGG16(model, 100)
+    train_VGG16(model, 50)
 
 
 if __name__ == '__main__':
