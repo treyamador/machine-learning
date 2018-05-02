@@ -1,33 +1,29 @@
 from __future__ import print_function
 
-from keras.layers import Dense, Dropout, Flatten, Activation, BatchNormalization
+from keras.layers import Dense, Dropout, Flatten, Activation, BatchNormalization, GlobalAveragePooling2D
 from keras.layers import Conv2D, MaxPooling2D
-from keras.callbacks import EarlyStopping
-from keras.callbacks import ModelCheckpoint
-from keras.optimizers import Adam
-from keras.models import Sequential
+from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
+from keras.optimizers import Adam, SGD
+from keras.models import Sequential, Model
 from keras.utils import plot_model
 import matplotlib.pyplot as plt
 from keras import backend as K
 from datetime import datetime
-from skimage import io
+from scipy import ndimage
 import numpy as np
 import os
 
-from keras.applications.resnet50 import ResNet50
-from keras.applications.inception_v3 import InceptionV3
-from keras.applications.vgg19 import VGG19
+from keras.applications.vgg16 import VGG16
 
 
-BASE_IMG_PATH = 'data/modtrain-d148-crop-b4'
+BASE_IMG_PATH = 'data/modtrain-d224-crop-b3'
 BATCH_SIZE = 128
 VALID_BATCH = BATCH_SIZE
 
 PIXEL_NORMAL = 255.0
-# AGE_NORMAL = 128.0
 
-IMG_WIDTH = 148
-IMG_HEIGHT = 148
+IMG_WIDTH = 224
+IMG_HEIGHT = 224
 
 
 if K.image_data_format() == 'channels_first':
@@ -54,7 +50,7 @@ def sep_paths():
 def generate_data(x_paths, y_target, batch):
     mod, idx = len(x_paths), 0
     while True:
-        imgs = [io.imread(x_paths[i % mod]) for i in range(idx, batch+idx)]
+        imgs = [ndimage.imread(x_paths[i % mod]) for i in range(idx, batch+idx)]
         trgs = [y_target[i % mod] for i in range(idx, batch+idx)]
         x = np.array(imgs, dtype=np.float32) / PIXEL_NORMAL
         y = np.array(trgs, dtype=np.float32)
@@ -89,7 +85,7 @@ def plot_one(history, path, fig_num, metric):
 def plot_history(history, path):
     plot_one(history, path, 1, 'loss')
     plot_one(history, path, 2, 'mean_squared_error')
-    plot_one(history, path, 4, 'acc')
+    plot_one(history, path, 3, 'acc')
 
 
 def current_time():
@@ -99,8 +95,8 @@ def current_time():
 def save_model(path, model, history):
     model.save_weights(path+'weights_final.h5')
     model.save(path+'model_final.h5')
-    plot_model(model, to_file=path+'model_summary.png', show_shapes=True)
     plot_history(history, path)
+    plot_model(model, to_file=path+'model_summary.png', show_shapes=True)
 
 
 def create_trivial():
@@ -170,9 +166,9 @@ def create_convolutional():
     model.add(MaxPooling2D(pool_size=(2, 2)))
 
     model.add(Flatten())
-    model.add(Dropout(0.5))
     model.add(Dense(512))
     model.add(Activation('relu'))
+    model.add(Dropout(0.5))
     model.add(Dense(1))
 
     model.compile(loss='mse',
@@ -182,95 +178,72 @@ def create_convolutional():
     return model
 
 
-def create_vgg16_custom():
-    # causes freezing on CPU
+def create_VGG16():
 
-    model = Sequential()
+    base_model = VGG16(weights='imagenet',
+                       include_top=False,
+                       input_shape=input_shape)
+    x = base_model.output
+    x = GlobalAveragePooling2D()(x)
+    x = Dense(1024, activation='relu')(x)
+    x = Dropout(0.3)(x)
+    predictions = Dense(1)(x)
 
-    model.add(Conv2D(64, (3, 3), activation='relu', padding='same', input_shape=input_shape))
-    model.add(Conv2D(64, (3, 3), activation='relu', padding='same'))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+    model = Model(inputs=base_model.input, outputs=predictions)
+    for layer in base_model.layers:
+        layer.trainable = False
 
-    model.add(Conv2D(128, (3, 3), activation='relu', padding='same'))
-    model.add(Conv2D(128, (3, 3), activation='relu', padding='same'))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-
-    model.add(Conv2D(256, (3, 3), activation='relu', padding='same'))
-    model.add(Conv2D(256, (3, 3), activation='relu', padding='same'))
-    model.add(Conv2D(256, (3, 3), activation='relu', padding='same'))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-
-    model.add(Conv2D(512, (3, 3), activation='relu', padding='same'))
-    model.add(Conv2D(512, (3, 3), activation='relu', padding='same'))
-    model.add(Conv2D(512, (3, 3), activation='relu', padding='same'))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-
-    model.add(Conv2D(512, (3, 3), activation='relu', padding='same'))
-    model.add(Conv2D(512, (3, 3), activation='relu', padding='same'))
-    model.add(Conv2D(512, (3, 3), activation='relu', padding='same'))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-
-    model.add(Flatten())
-    model.add(Dense(4096, activation='relu'))
-    model.add(Dense(4096, activation='relu'))
-    model.add(Dense(1))
-
-    model.compile(loss='mse',
-                  optimizer=Adam(),
-                  metrics=['mae', 'mse', 'acc'])
+    model.compile(optimizer=Adam(),
+                  loss='mse',
+                  metrics=['acc', 'mse'])
 
     return model
 
 
-def create_resnet_50():
-    model = ResNet50(weights=None, classes=1)
-    model.compile(loss='mse',
-                  optimizer=Adam(),
-                  metrics=['mae', 'mse', 'acc'])
-    return model
-
-
-def create_inception3():
-    model = InceptionV3(weights=None, classes=1)
-    model.compile(loss='mse',
-                  optimizer=Adam(),
-                  metrics=['mae', 'mse', 'acc'])
-    return model
-
-
-def create_vgg19():
-    model = VGG19(weights=None, classes=1)
-    model.compile(loss='mse',
-                  optimizer=Adam(),
-                  metrics=['mse', 'acc'])
-    return model
-
-
-def run_linear():
+def train_VGG16(model, epochs):
 
     train_paths, train_ages, val_paths, val_ages = sep_paths()
 
     steps_per_epoch = len(train_paths) / BATCH_SIZE
     validation_steps = len(val_paths) / VALID_BATCH
-    epochs = 50
 
     file_time = current_time()
     os.mkdir('models/'+file_time)
 
-    callback_stopping = EarlyStopping(patience=2)
-    callback_checkpoint = ModelCheckpoint('models/' + file_time +
-                                          '/model.epoch: {epoch: 02d} - mse: {mean_squared_error: .2f}.hdf5')
+    callback_stopping = EarlyStopping(patience=3, monitor='val_loss')
+    callback_checkpoint = ModelCheckpoint('models/model.vgg16.epoch.best.hdf5',
+                                          save_best_only=True, monitor='val_loss')
+    callback_csv = CSVLogger('models/'+file_time+'/run_log.csv', append=True)
 
-    model = create_convolutional()
     history = model.fit_generator(generate_data(train_paths, train_ages, BATCH_SIZE),
                                   steps_per_epoch=steps_per_epoch,
                                   epochs=epochs,
                                   verbose=1,
-                                  callbacks=[callback_checkpoint, callback_stopping],
+                                  callbacks=[callback_checkpoint, callback_stopping, callback_csv],
                                   validation_data=generate_data(val_paths, val_ages, VALID_BATCH),
                                   validation_steps=validation_steps)
 
-    save_model('models/'+file_time+'/', model, history)
+    save_model('models/' + file_time + '/', model, history)
+
+    return model
+
+
+def run_linear():
+
+    model = create_VGG16()
+    model = train_VGG16(model, 3)
+
+    for layer in model.layers[:15]:
+        layer.trainable = False
+    for layer in model.layers[15:]:
+        layer.trainable = True
+
+    model.compile(loss='mse',
+                  optimizer=SGD(lr=0.0001,
+                                momentum=0.9),
+                  metrics=['acc', 'mse'])
+
+    train_VGG16(model, 100)
 
 
 if __name__ == '__main__':
