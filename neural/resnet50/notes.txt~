@@ -1,0 +1,10 @@
+train resnet with sgd at diminishing levels
+Adam
+	good default settings:
+		alpha==0.001
+		beta1==0.9
+		beta2==0.999
+		weight decay==1e-5 ?
+		no dropout
+
+	an epsilon of 0.1 may work for InceptionNet

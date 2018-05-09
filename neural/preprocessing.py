@@ -6,38 +6,14 @@ from skimage import io
 import dlib
 import cv2
 import os
-import numpy as np
 
 
-# DEFAULT_DIMENSION = 500
-# BORDER_NORM = 3
-
-
-# DEFAULT_DIMENSION = 384
-BORDER_NORM = 3
-
-# DEFAULT_DIMENSION = 192
-
-# DEFAULT_DIMENSION = 148
-
+BORDER_NORM = 2
 DEFAULT_DIMENSION = 224
 
 
-# WIDTH_BORDER = 5
-# HEIGHT_BORDER = 3
-
-
 detector = dlib.get_frontal_face_detector()
-win = dlib.image_window()
-
-
-def show_dlib(img, overlay=None):
-    win.clear_overlay()
-    win.set_image(img)
-    if overlay:
-        print(overlay)
-        win.add_overlay(overlay)
-    dlib.hit_enter_to_continue()
+# win = dlib.image_window()
 
 
 def show_cv(img):
@@ -54,10 +30,26 @@ def read_training():
     return training
 
 
+'''
+
+def process_img(img):
+    img = transform.resize(img, (DEFAULT_DIMENSION, DEFAULT_DIMENSION,))
+    if len(img.shape) == 2:
+        img = color.gray2rgb(img)
+    return img
+
+
+'''
+
+
 def process_img(img):
     # TODO determine if cropping is advisable, and to what degree
     # TODO perhaps rotate face image for straight ahead look?
-    det = detector(img, 1)
+    try:
+        det = detector(img, 1)
+    except RuntimeError as err:
+        print(err)
+        return None
     if len(det) != 1:
         return None
 
@@ -75,6 +67,19 @@ def process_img(img):
     lft_off = lft_off if lft_off > 0 else 0
     rgt_off = rgt_off if rgt_off < img.shape[1] else img.shape[1]
 
+    hgt_off = btm_off - top_off
+    wgt_off = rgt_off - lft_off
+    if hgt_off < DEFAULT_DIMENSION // 2 or wgt_off < DEFAULT_DIMENSION // 2:
+        return None
+
+    # if hgt_off != wgt_off:
+    #     return None
+
+    if hgt_off < 3*(wgt_off//4):
+        return None
+    if wgt_off < 3*(hgt_off//4):
+        return None
+
     img = img[top_off:btm_off, lft_off:rgt_off, ]
 
     # TODO remove this, or write it programmatically
@@ -85,48 +90,28 @@ def process_img(img):
     return img
 
 
-def get_mp():
-    return 'data/modtrain'+'-d'+str(DEFAULT_DIMENSION)+'-crop-b'+str(BORDER_NORM)
+def get_dir():
+    return 'data/modtrain'+'-d'+str(DEFAULT_DIMENSION)+''
 
 
 def run():
     bp = 'data/train'
-    mp = get_mp()
-    # os.mkdir(mp)
+    mp = get_dir()
+    os.mkdir(mp)
     exts = [x for x in os.listdir(bp)]
     paths = [bp+'/'+x for x in exts]
     directory = read_training()
     imgs = io.imread_collection(paths)
-    out_ages = []
-    out_imgs = []
-    out_dirs = []
     ttl = len(exts)
-    itr = 1
-    for ext, img in zip(exts, imgs):
-        img = process_img(img)
-        if img is not None:
-            out_ages.append(directory[ext])
-            out_imgs.append(img)
-            print(itr, 'of', ttl, 'at', ext)
-            out_dirs.append(ext)
-        itr += 1
-    np.save(mp+'.npy', out_imgs)
-    np.save(mp+'_target.npy', out_ages)
-    return out_dirs
-
-
-def validate_files(exts):
-    imgs = np.load(get_mp()+'.npy')
-    ages = np.load(get_mp()+'_target.npy')
-    # for i, ext in enumerate(exts):
-    #     print(i, 'at', ext, '...', ages[i])
-    #     show_cv(imgs[i])
-    print('\n\nof the shape:')
-    print(imgs.shape)
-    print(ages.shape)
+    with open(mp+'_target.csv', 'wt') as f_obj:
+        itr = 1
+        for ext, img in zip(exts, imgs):
+            img = process_img(img)
+            f_obj.write(ext+','+str(directory[ext])+'\n')
+            io.imsave(mp+'/'+ext, img)
+            print(itr, 'of', ttl)
+            itr += 1
 
 
 if __name__ == '__main__':
-    exts = run()
-    validate_files(exts)
-
+    run()
